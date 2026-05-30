@@ -1,0 +1,168 @@
+#include "motor_ctrl.h"
+
+// 电机归零
+void PositionToZero(void)
+{
+    TIM1->CCER |= 0x5555;
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
+    HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_1);
+    HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_2);
+    HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_3);
+    HAL_Delay(100);
+
+    Svpwm.Ualpha = 1; // 调零电压
+    Svpwm.Ubeta = 0;
+    SvpwmCal((M_SVPWM)&Svpwm); // 将Alpha和Beta电压带入计算SVPWM的占空比
+    HAL_Delay(1000);
+    TIM3->CNT = 0;     // 清除编码器当前计数值
+    Motor.E_theta = 0; // 电角度清零
+    HAL_Delay(500);
+
+    TIM1->CCER &= 0xAAAA;
+    HAL_Delay(500);
+}
+
+// 二次定位调零
+void PostionToZeroDouble(void)
+{
+    TIM1->CCER |= 0x5555;
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
+    HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_1);
+    HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_2);
+    HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_3);
+
+    HAL_Delay(100);
+
+    Svpwm.Ualpha = 0.0f; // 调零电压
+    Svpwm.Ubeta = 0.5f;
+    SvpwmCal((M_SVPWM)&Svpwm); // 将Alpha和Beta电压带入计算SVPWM的占空比
+    HAL_Delay(1000);
+
+    Svpwm.Ualpha = 0.5f; // 调零电压
+    Svpwm.Ubeta = 0.0f;
+    SvpwmCal((M_SVPWM)&Svpwm); // 将Alpha和Beta电压带入计算SVPWM的占空比
+    HAL_Delay(1000);
+
+    TIM3->CNT = 0; // 清除编码器当前计数值
+    Motor.E_theta = 0;
+
+    HAL_Delay(1000);
+
+    TIM1->CCER &= 0xAAAA;
+    HAL_Delay(1000);
+
+    MotorStop();
+}
+
+// 有感,电流闭环
+void CurCloseloop(float IqRef, float Theta)
+{
+    pi_id.Ref = 0.0f; // id=0，d轴电流闭环，力矩大
+    pi_id.Fbk = Park.Ds;
+    PiController((M_PI_Control)&pi_id); // Id轴闭环
+
+    pi_iq.Ref = IqRef;
+    pi_iq.Fbk = Park.Qs;
+    PiController((M_PI_Control)&pi_iq); // Iq轴闭环
+
+    Ipark.Theta = Theta;
+    Ipark.Ds = pi_id.Out;
+    Ipark.Qs = pi_iq.Out;
+    IPARK_Cale((M_IPARK)&Ipark); // IPARK函数计算
+}
+
+// UseRamp: 1-使用梯度计算（用于纯速度模式）, 0-直接给定（用于位置模式）
+void SpeedCloseloop(int16_t SpeedRef, uint8_t UseRamp)
+{
+    float final_spd_ref = 0.0f;
+
+    if (UseRamp)
+    {
+		SpdRefGXieLv.XieLv_Grad = SPD_REF_OD;	 // 定义速度的梯度值
+		SpdRefGXieLv.Grad_Timer = SPD_REF_TIMER; // 定义速度的梯度时间
+        SpdRefGXieLv.XieLv_X = SpeedRef;
+        SpdRefGXieLv.Timer_Count++;
+        if (my_abs(pi_spd.Ref - pi_spd.Fbk) >= 1000)
+            SpdRefGXieLv.Timer_Count--;
+
+        if (SpdRefGXieLv.Timer_Count > SpdRefGXieLv.Grad_Timer)
+        {
+            SpdRefGXieLv.Timer_Count = 0;
+            GradXieLv((p_GXieLv)&SpdRefGXieLv);
+        }
+        final_spd_ref = Limit_Sat(SpdRefGXieLv.XieLv_Y, SPD_REF_MAX, -SPD_REF_MAX);
+    }
+    else
+    {
+        final_spd_ref = (float)SpeedRef;
+        final_spd_ref = Limit_Sat(final_spd_ref, 100, -100);//位置环速度限制
+    }
+
+    // 速度环计算频率控制
+    if (++Para.SpeedCalTime >= SPEED_CNT)
+    {
+        Para.SpeedCalTime = 0;
+
+        pi_spd.Ref = final_spd_ref * Motor.P;
+        pi_spd.Fbk = Motor.speed_E_rpm;
+
+        PiController((M_PI_Control)&pi_spd); // 速度PI计算
+
+        pi_spd.OutF = pi_spd.OutF * LPF_I_RUN_B + pi_spd.Out * LPF_I_RUN_A;
+    }
+
+    CurCloseloop(pi_spd.OutF, Motor.E_theta);
+}
+
+// 有感，位置环
+#define ENC_MIN 1
+#define ENC_MAX 3999
+#define ENC_RANGE (ENC_MAX - ENC_MIN + 1) // 3999
+#define POS_MAX_SPEED 3000                // 位置环输出的最大转速限制 (RPM)
+#define POS_I_LIMIT 500                   // 位置环积分限幅，防止过冲
+
+void PosCloseloop(void)
+{
+    static uint32_t PosLoopDivCnt = 0;
+    float SpeedRef = 0.0f;
+
+    Pos.P_Fdb = TIM3->CNT;
+
+    if (++PosLoopDivCnt >= 4)
+    {
+        PosLoopDivCnt = 0;
+
+        // 目标位置映射 (Para.PosRef: 0..4095 -> mapped: 3999..1)
+        uint32_t t = ((uint32_t)Para.PosRef * (ENC_RANGE - 1)) >> 12;
+        uint16_t mapped = (uint16_t)(ENC_MAX - t);
+        Pos.P_Ref = (int32_t)mapped;
+
+        int32_t err = (int32_t)mapped - (int32_t)Pos.P_Fdb;
+        int32_t half = ENC_RANGE / 2;
+        if (err > half)
+            err -= ENC_RANGE;
+        else if (err < -half)
+            err += ENC_RANGE;
+
+        // 比例项
+        float up = Pos.Kp * (float)err;
+
+        // 积分项
+        /*
+        Pos.P_Integral += Pos.Ki * (float)err;
+        Pos.P_Integral = Limit_Sat(Pos.P_Integral, POS_I_LIMIT, -POS_I_LIMIT); // 抗饱和
+        SpeedRef = up + Pos.P_Integral;
+        */
+
+        SpeedRef = up; // 目前仅使用 P 控制
+
+        // 输出限幅：防止位置偏差过大导致给出的速度参考值溢出或过快
+        Pos.P_Out = (int16_t)Limit_Sat(SpeedRef, POS_MAX_SPEED, -POS_MAX_SPEED);
+    }
+
+    SpeedCloseloop(Pos.P_Out, 0);
+}

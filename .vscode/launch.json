@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "J-Link Debug",
+            "type": "cortex-debug",
+            "request": "launch",
+            "servertype": "jlink",
+            "cwd": "${workspaceFolder}",
+            "executable": "F:/inmop_foc/5_2_STM32_FOC_LOOP_4096_C30/5_2_STM32_FOC_LOOP_4096_C30/build/Debug/STM32_FOC.elf", 
+            "device": "STM32F407VE", 
+            "interface": "swd",
+            "runToEntryPoint": "main",
+            "serverpath": "F:/JLINK/jlink942/JLink_V942/JLinkGDBServerCL.exe",
+            "gdbPath": "F:/arm-gcc/bin/arm-none-eabi-gdb.exe",
+            "svdFile": "F:/inmop_foc/5_2_STM32_FOC_LOOP_4096_C30/5_2_STM32_FOC_LOOP_4096_C30/STM32F407.svd"
+        }
+    ]
+}
