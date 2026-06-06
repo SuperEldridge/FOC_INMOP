@@ -122,11 +122,18 @@ void task_init(void)
 	MotorInit(); // 电机参数初始化
 
 	HAL_Delay(100);
-	HAL_ADC_Start_DMA(&hadc1, (uint32_t *)&ADC_Value, 5);		  // 开启ADC-DMA转换
+	HAL_ADC_Start_DMA(&hadc1, (uint32_t *)&ADC_Value, 3);
+	HAL_ADCEx_InjectedStart(&hadc1);
+	
+	 /* 必须先启动 TIM1_CH4，比对事件出来后 injected 才会更新 JDR1/JDR2 */
+  	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_4, CCR4_MAX);
+  	HAL_TIM_OC_Start(&htim1, TIM_CHANNEL_4);
+
 	HAL_TIM_Encoder_Start(&htim3, TIM_CHANNEL_1 | TIM_CHANNEL_2); // 开启编码器使能函数
 
+	HAL_Delay(20);
 	AdcSampleOffset(); // 零点校准
-
+	
 	Init_Over = 1;
 
 	Motor.CtrlMode = TO_ZERO;

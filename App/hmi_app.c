@@ -220,19 +220,19 @@ void RecevToVofa(void)
 // 数据发送至上位机观测
 void SendToVofa(void)
 {
-	Usart.VofaData[0] = Motor.speed_M_rpm;	  // 电角度
-	Usart.VofaData[1] = pi_iq.Ref*100;		  	  // 目标电流
-	Usart.VofaData[2] = pi_iq.Fbk*100; 			  // 实际电流
-	Usart.VofaData[3] = Motor.E_theta;		  // 编码器角度
-	Usart.VofaData[4] = flux.theta_e;		  // 磁链观测角度
-	Usart.VofaData[5] = PllHfiPara.Theta;	  // HFI角度
-	Usart.VofaData[6] = PllSmoPara.Angle;	  // 滑膜观测角度
-	Usart.VofaData[7] = Para.IfTheta;		  // IF强拖角度
-	Usart.VofaData[8] = AdcFilPara.CurU;	  // U相电流
-	Usart.VofaData[9] = AdcFilPara.CurV;	  // V相电流
-	Usart.VofaData[10] = AdcFilPara.CurW;	  // W相电流
-	Usart.VofaData[11] = TIM3->CNT;			  // 实际位置
-	Usart.VofaData[12] = Pos.P_Ref;			  // 目标位置
+	Usart.VofaData[0] = pi_iq.Ref;	  // 电角度
+	Usart.VofaData[1] = pi_iq.Fbk;		  	  // 目标电流
+	Usart.VofaData[2] = pi_iq.Out; 			  // 实际电流
+	Usart.VofaData[3] = CCR4_MAX;		  // 编码器角度
+	Usart.VofaData[4] = AdcFilPara.CurU;		  // 磁链观测角度
+	Usart.VofaData[5] = AdcFilPara.CurV;	  // HFI角度
+	Usart.VofaData[6] = AdcFilPara.CurW;	  // 滑膜观测角度
+	Usart.VofaData[7] = pi_id.Ref;		  // IF强拖角度
+	Usart.VofaData[8] = pi_id.Fbk;	  // U相电流
+	Usart.VofaData[9] = pi_spd.OutF;	  // V相电流
+	Usart.VofaData[10] = Wm;	  // W相电流
+	Usart.VofaData[11] = Park.Ds;			  // 实际位置
+	Usart.VofaData[12] = Park.Qs;			  // 目标位置
 	JustFloatSend(Usart.VofaData, 13, USART1);
 }
 

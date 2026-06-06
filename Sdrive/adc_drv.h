@@ -56,7 +56,7 @@ typedef struct
 
 #define Voltage_Compensation_DEFAULTS {0, 0, 0, 0, 0}
 
-extern uint16_t ADC_Value[5]; // ADC接收数组
+extern uint16_t ADC_Value[3]; // ADC接收数组
 extern uint8_t NTC_ERROR;	  // NTC温度报警
 
 extern ADC_Sample AdcPara;

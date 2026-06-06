@@ -3,7 +3,9 @@
 // 电机归零
 void PositionToZero(void)
 {
-    TIM1->CCER |= 0x5555;
+    TIM1->CCER |= (TIM_CCER_CC1E | TIM_CCER_CC1NE |
+                 TIM_CCER_CC2E | TIM_CCER_CC2NE |
+                 TIM_CCER_CC3E | TIM_CCER_CC3NE);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
@@ -20,14 +22,18 @@ void PositionToZero(void)
     Motor.E_theta = 0; // 电角度清零
     HAL_Delay(500);
 
-    TIM1->CCER &= 0xAAAA;
+    TIM1->CCER &= ~(TIM_CCER_CC1E | TIM_CCER_CC1NE |
+                  TIM_CCER_CC2E | TIM_CCER_CC2NE |
+                  TIM_CCER_CC3E | TIM_CCER_CC3NE);
     HAL_Delay(500);
 }
 
 // 二次定位调零
 void PostionToZeroDouble(void)
 {
-    TIM1->CCER |= 0x5555;
+    TIM1->CCER |= (TIM_CCER_CC1E | TIM_CCER_CC1NE |
+                 TIM_CCER_CC2E | TIM_CCER_CC2NE |
+                 TIM_CCER_CC3E | TIM_CCER_CC3NE);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
@@ -52,8 +58,12 @@ void PostionToZeroDouble(void)
 
     HAL_Delay(1000);
 
-    TIM1->CCER &= 0xAAAA;
+    TIM1->CCER &= ~(TIM_CCER_CC1E | TIM_CCER_CC1NE |
+                  TIM_CCER_CC2E | TIM_CCER_CC2NE |
+                  TIM_CCER_CC3E | TIM_CCER_CC3NE);
     HAL_Delay(1000);
+
+    TIM1->CCER |= TIM_CCER_CC4E;
 
     MotorStop();
 }
@@ -102,6 +112,8 @@ void SpeedCloseloop(int16_t SpeedRef, uint8_t UseRamp)
         final_spd_ref = Limit_Sat(final_spd_ref, 100, -100);//位置环速度限制
     }
 
+    float iq_ref = 0.0f;
+    float active_damp_iq = 0.0f;
     // 速度环计算频率控制
     if (++Para.SpeedCalTime >= SPEED_CNT)
     {
@@ -115,7 +127,23 @@ void SpeedCloseloop(int16_t SpeedRef, uint8_t UseRamp)
         pi_spd.OutF = pi_spd.OutF * LPF_I_RUN_B + pi_spd.Out * LPF_I_RUN_A;
     }
 
-    CurCloseloop(pi_spd.OutF, Motor.E_theta);
+    #if SPD_ACTIVE_DAMP_EN
+        /* 有功阻尼项：
+        * 1. 当前速度环内部使用的是电角速度 rpm，因此这里直接基于
+    Motor.speed_E_rpm 构造阻尼项；
+        * 2. 阻尼项始终与当前转速方向相反，相当于在速度升高时主动减小 q
+    轴给定电流；
+        * 3. 通过限幅防止高速区阻尼项过大，导致输出电流被过度压制。
+        */
+    active_damp_iq = SPD_ACTIVE_DAMP_KE * Motor.speed_E_rpm;
+    active_damp_iq = Limit_Sat(active_damp_iq, SPD_ACTIVE_DAMP_MAX,-SPD_ACTIVE_DAMP_MAX);
+    #endif
+    
+    /* 速度环最终输出 = PI 输出 - 有功阻尼项 */
+    iq_ref = pi_spd.OutF - active_damp_iq;
+    iq_ref = Limit_Sat(iq_ref, PI_MAX_SPD, -PI_MAX_SPD);
+    
+    CurCloseloop(iq_ref, Motor.E_theta);
 }
 
 // 有感，位置环

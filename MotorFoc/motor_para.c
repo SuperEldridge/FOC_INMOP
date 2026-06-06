@@ -267,8 +267,8 @@ void MotorInit(void)
 {
 	Para.SpdSenKp = 0.001f;
 	Para.SpdSenKi = 0.1f;
-	Para.SpdLessKp = 0.0005f;
-	Para.SpdLessKi = 0.01f;
+	Para.SpdLessKp = 0.002589f;
+	Para.SpdLessKi = 0.05177f;
 	Pos.Kp = 0.3;
 	//Para.PosRef = 1000;
 

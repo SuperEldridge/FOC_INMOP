@@ -41,6 +41,31 @@
 #define PI_MAX_Ud /*********************/ 6.0f       //  (STAN_VOLTAGE_V*SART_OF_3*0.92)   // 13.5  //12.347
 #define PI_MAX_Uq /*********************/ 6.0f       //  (STAN_VOLTAGE_V*SART_OF_3*0.92)
 #define PI_MAX_SPD /********************/ 10.0f      // 最大电流限制
+#define kserver /********************/ 0.5f       // 服务器系数
+#define Umod_NOW /********************/ (sqrtf(Svpwm.Ualpha * Svpwm.Ualpha + Svpwm.Ubeta *Svpwm.Ubeta))
+#define SVPWM_KM_NOW /********************/ (AdcPara.Vbus * SART_OF_3)
+#define SVPWM_KM_NOW_BACKW /********************/ (1.0f / SVPWM_KM_NOW) // 倒数  1/(AdcPara.Vbus*SART_OF_3)
+#define CCR4_MAX /********************/   8300//((TIM1_PERIOD-1)-(SVPWM_KM_NOW-Umod_NOW)*SVPWM_KM_NOW_BACKW*TIM1_PERIOD_HALF*kserver)    // 定时器1_CH4的重装载值
+#define Kt /**************************/ 0.0007404636f // 电机转矩常数
+#define B /**************************/  0.0000016247f // 黏性摩擦系数B
+#define Wm /**************************/ ((Motor.speed_M_rpm/60)*PIX2) // 电机转速
+#define W_alpha /**************************/ 3090.588f
+#define J /**************************/ 0.0000000958346f // 电机惯量
+#define Psi_f /**************************/ 0.00007052f // 电机磁通量常数
+
+//死区补偿参数
+#define DT_COMP_EN /*******************/ 1     // 死区补偿使能：1-使能，0-关闭
+#define DT_COMP_CCR /******************/ 20    // 死区补偿计数值，初始建议从 40 开始调试
+#define DT_COMP_CUR_TH /***************/ 0.05f //电流符号判定死区，避免过零附近抖动翻转
+#define DT_COMP_CCR_MARGIN /***********/ 5     // CCR限幅保护边界，防止补偿后贴边
+
+//速度环有功阻尼参数
+#define SPD_BETA /************************/ 20.0f
+#define SPD_ACTIVE_DAMP_BA /**************/ ((SPD_BETA * J - B) / (1.5f * MOTOR_P * Psi_f))
+#define SPD_ACTIVE_DAMP_KE /**************/ (SPD_ACTIVE_DAMP_BA * PIX2 / (60.0f * MOTOR_P))
+#define SPD_ACTIVE_DAMP_MAX /*************/ 5.0f
+#define SPD_ACTIVE_DAMP_EN /**************/ 1
+
 
 // 电机运行模式
 #define M_ERR /*************************/ 11 // 电机错误状态
@@ -55,6 +80,7 @@
 #define HFI_FLUX /**********************/ 7  // 低速HFI高速磁链
 #define IF_SMO /************************/ 8  // IF启动高速SMO
 #define IF_FLUX /***********************/ 9  // IF启动高速磁链
+#define V_F /**************************/  12  // 压频比开环控制
 
 // IF强拖参数
 #define QT_ANGLE /**********************/ 210  // 强拖至角度（0——360）

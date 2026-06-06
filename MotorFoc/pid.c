@@ -42,17 +42,17 @@ void PiParaInit(void)
 	pi_spd.Umax = PI_MAX_SPD;  //  µçÁ÷ 10
 	pi_spd.Umin = -PI_MAX_SPD; //-10
 
-	pi_id.Kp = 0.3f;  //
-	pi_id.Ki = 1000.0f; //
+	pi_id.Kp = 0.17436f;  //0.01453f
+	pi_id.Ki = 844.46f; //70.372f
 	pi_id.Umax = PI_MAX_Ud;
 	pi_id.Umin = -PI_MAX_Ud;
 
-	pi_iq.Kp = 0.3f;
-	pi_iq.Ki = 1000.0f;
+	pi_iq.Kp = 0.17436f;
+	pi_iq.Ki = 844.46f; //
 	pi_iq.Umax = PI_MAX_Uq;
 	pi_iq.Umin = -PI_MAX_Uq; //-PI_MAX_Uq
 
-	pi_pos.Kp = 0.02f;
+	pi_pos.Kp = 0.002f;
 	pi_pos.Ki = 0.0f;
 	pi_pos.Umax = SPD_REF_MAX;
 	pi_pos.Umin = -SPD_REF_MAX; //-PI_MAX_Uq

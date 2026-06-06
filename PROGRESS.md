@@ -1,0 +1,14 @@
+- 当前工程的有感 FOC 主框架由 `TIM1` 更新中断驱动，核心执行入口位于 `Sdrive/tim_drv.c` 的 `HAL_TIM_PeriodElapsedCallback()`；中断主顺序为 `GetAdc() -> AxisDq() -> MotorModeSel()`，因此采样、坐标变换、控制器与 SVPWM 都耦合在同一条 20kHz 实时闭环链路上。
+- `App/task.c` 的 `task_init()` 负责启动控制底座：开启 `TIM1` 基础中断、启动 ADC1 regular DMA、启动 ADC1 injected 转换，并在系统上电后执行 `AdcSampleOffset()` 完成两相电流零偏校准。
+- `Sdrive/adc_drv.c` 是采样汇聚层：`ADC_Value[3]` 仅承载温度、母线电压、电位器等辅助量；相电流由 injected 通道 `ADC1->JDR1/JDR2` 读取，按 `CurU = (OffsetCurU - raw_u) * I_GAIN`、`CurW = (OffsetCurW - raw_w) * I_GAIN` 重建，再由 `CurV = -CurU - CurW` 补足三相。
+- `MotorFoc/foc.c` 是纯数学变换层：三相电流先经 Clarke 变换得到 `Alpha/Beta`，再经 Park 变换得到 `Ds/Qs`；电流环输出的 `Ud/Uq` 再经 IPark 和 SVPWM 生成 `CCR1~CCR3`。因此采样极性、角度极性、相序映射一旦错误，会直接传导到整个 FOC 闭环。
+- `MotorFoc/motor_ctrl.c` 的 `AxisDq()` 是有感/无感共用的前处理主入口：读取 `AdcPara.CurU/V/W` 做 Clarke，调用 `MotorAngleGet()` 获取编码器角度，必要时更新 HFI/SMO/Flux 等观测器状态，然后选择 `Park.Theta` 的角度来源并完成 Park 变换。
+- 在标准有感模式下，`AxisDq()` 最终使用 `Motor.E_theta` 作为 `Park.Theta`，因此有感 FOC 的核心角度链是“编码器/传感器 -> `Motor.E_theta` -> Park 变换 -> dq 电流反馈 -> 电流环 -> IPark/SVPWM”。
+- `MotorFoc/sen.c` 中 `CurCloseloop()` 构成最内层电流环：固定 `Id=0`，以 `Park.Ds/Qs` 为反馈，经 `pi_id/pi_iq` 计算得到 `Ud/Uq`，再送入 `IPARK_Cale()` 形成电压矢量。
+- `MotorFoc/sen.c` 中 `SpeedCloseloop()` 构成速度中环：支持速度给定斜坡，按 `SPEED_CNT=2` 降频执行速度 PI；其中 `pi_spd.Ref = final_spd_ref * Motor.P`，`pi_spd.Fbk = Motor.speed_E_rpm`，表明当前速度环工作在“电角速度参考/电角速度反馈”框架下，PI 输出 `pi_spd.OutF` 直接作为 `IqRef` 送入 `CurCloseloop()`。
+- `MotorFoc/sen.c` 中 `PosCloseloop()` 构成位置外环：读取 `TIM3->CNT` 作为位置反馈，完成编码器环绕误差处理后，以 P 控制生成速度参考，再调用 `SpeedCloseloop()`。因此位置模式链路本质为“位置误差 -> 速度参考 -> 速度环 -> 电流环”。
+- `MotorFoc/motor_ctrl.c` 的 `MotorModeSel()` 是控制总调度器：根据 `Motor.CtrlMode` 进入 `SPEED_LOOP / CUR_LOOP / POS_LOOP / IF / HFI / SMO / FLUX / TO_ZERO` 等分支，完成各模式控制计算后统一进入 `FocSvpwm()` 输出。
+- `MotorFoc/motor_ctrl.c` 的 `FocSvpwm()` 在 `SvpwmCal()` 后还会调用 `DeadtimeCompApply()`，依据 `AdcFilPara.CurU/V/W` 的方向对 `CCR1~CCR3` 做死区补偿。因此低速抖动、小电流过零抖动不仅与速度环参数有关，也与电流采样符号和死区补偿阈值直接相关。
+- `MotorFoc/pid.c` 完成 PI 控制器初始化与离散 PI 实现：速度环参数来自 `Para.SpdLessKp/SpdLessKi`，电流环 `pi_id/pi_iq` 目前为固定参数，位置环当前主要使用 `PosCloseloop()` 中的手写 P 控制。
+- `MotorFoc/motor_para.h` 是后续有感控制调试的核心参数区，关键基准包括 `PWM_FRQ/TS/SPEED_CNT`，关键对象参数包括 `MOTOR_P/MOTOR_Ls/MOTOR_Rs/Kt/B`。
+- 从当前代码结构看，有感 FOC 的主数据流可概括为：`ADC采样 -> GetAdc() -> AxisDq() -> Clarke/Park -> Speed/Current/Position 控制 -> IPark/SVPWM -> TIM1 CCR更新`。

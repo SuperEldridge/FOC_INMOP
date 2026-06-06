@@ -43,7 +43,9 @@ void GradXieLv(p_GXieLv pv) // 斜率梯度计算 ，按照一定梯度值加加
 void MotorStop(void)
 {
 	// 关闭三相互补 PWM 输出，防止停机后继续驱动功率管
-	TIM1->CCER &= 0xAAAA; // 不使能PWM输出通道OC1/OC1N/OC2/OC2N/OC3/OC3N
+	TIM1->CCER &= ~(TIM_CCER_CC1E | TIM_CCER_CC1NE |
+                	TIM_CCER_CC2E | TIM_CCER_CC2NE |
+                	TIM_CCER_CC3E | TIM_CCER_CC3NE); // 不使能PWM输出通道OC1/OC1N/OC2/OC2N/OC3/OC3N
 
 	TIM1->CCR1 = 0;
 	TIM1->CCR2 = 0;
@@ -57,13 +59,17 @@ void MotorRun(void)
 {
 	// Fault_Detection();				//启动前先进行故障检测
 	// 使能三相上下桥 PWM 输出，后续占空比由 SVPWM 更新
-	TIM1->CCER |= 0x5555;
+	TIM1->CCER |= (TIM_CCER_CC1E | TIM_CCER_CC1NE |
+                	TIM_CCER_CC2E | TIM_CCER_CC2NE |
+                	TIM_CCER_CC3E | TIM_CCER_CC3NE);
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
 	HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_1);
 	HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_2);
 	HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_3);
+
+  	TIM1->CCER |= TIM_CCER_CC4E;
 }
 
 // 强制拖动
@@ -614,6 +620,45 @@ void IFStartControl(void)
 	CurCloseloop(Para.CurRef, Para.FocAngle);
 }
 
+// 死区补偿符号函数：过零附近输出 0，避免补偿方向在噪声下反复抖动
+static int8_t DtCompSign(float cur)
+{
+      if (cur > DT_COMP_CUR_TH)
+              return 1;
+      else if (cur < -DT_COMP_CUR_TH)
+              return -1;
+      else
+              return 0;
+}
+
+// 死区补偿 CCR 限幅：防止补偿后比较值过小或过大，贴近边沿区域
+static uint16_t DtCompClampCcr(int32_t ccr)
+{
+      int32_t ccr_min = DT_COMP_CCR_MARGIN;
+      int32_t ccr_max = TIM1_PERIOD - DT_COMP_CCR_MARGIN;
+      if (ccr < ccr_min)
+              ccr = ccr_min;
+      else if (ccr > ccr_max)
+              ccr = ccr_max;
+      return (uint16_t)ccr;
+}
+
+// 死区补偿：依据三相电流方向对三相比较值做微小修正
+static void DeadtimeCompApply(void)
+{
+#if (DT_COMP_EN == 1)
+      int8_t sign_u = DtCompSign(AdcFilPara.CurU);
+      int8_t sign_v = DtCompSign(AdcFilPara.CurV);
+      int8_t sign_w = DtCompSign(AdcFilPara.CurW);
+      int32_t ccr1 = (int32_t)TIM1->CCR1 + sign_u * DT_COMP_CCR;
+      int32_t ccr2 = (int32_t)TIM1->CCR2 + sign_v * DT_COMP_CCR;
+      int32_t ccr3 = (int32_t)TIM1->CCR3 + sign_w * DT_COMP_CCR;
+      TIM1->CCR1 = DtCompClampCcr(ccr1);
+      TIM1->CCR2 = DtCompClampCcr(ccr2);
+      TIM1->CCR3 = DtCompClampCcr(ccr3);
+#endif
+}
+
 // SVPWM计算
 void FocSvpwm(void)
 {
@@ -621,6 +666,8 @@ void FocSvpwm(void)
 	Svpwm.Ualpha = Ipark.Alpha; // IPARK的数据传入SVPWM
 	Svpwm.Ubeta = Ipark.Beta;
 	SvpwmCal((M_SVPWM)&Svpwm); // 将Alpha和Beta电压带入计算SVPWM的占空比
+	// 在三相比较值已经生成后，根据三相电流方向做死区补偿
+    DeadtimeCompApply();
 }
 
 // HFI + Flux Observer 全速无感控制
