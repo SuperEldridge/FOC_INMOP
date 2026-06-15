@@ -45,7 +45,7 @@
 #define Umod_NOW /********************/ (sqrtf(Svpwm.Ualpha * Svpwm.Ualpha + Svpwm.Ubeta *Svpwm.Ubeta))
 #define SVPWM_KM_NOW /********************/ (AdcPara.Vbus * SART_OF_3)
 #define SVPWM_KM_NOW_BACKW /********************/ (1.0f / SVPWM_KM_NOW) // 倒数  1/(AdcPara.Vbus*SART_OF_3)
-#define CCR4_MAX /********************/   8300//((TIM1_PERIOD-1)-(SVPWM_KM_NOW-Umod_NOW)*SVPWM_KM_NOW_BACKW*TIM1_PERIOD_HALF*kserver)    // 定时器1_CH4的重装载值
+#define CCR4_MAX /********************/   8325//((TIM1_PERIOD-1)-(SVPWM_KM_NOW-Umod_NOW)*SVPWM_KM_NOW_BACKW*TIM1_PERIOD_HALF*kserver)    // 定时器1_CH4的重装载值
 #define Kt /**************************/ 0.0007404636f // 电机转矩常数
 #define B /**************************/  0.0000016247f // 黏性摩擦系数B
 #define Wm /**************************/ ((Motor.speed_M_rpm/60)*PIX2) // 电机转速
@@ -55,12 +55,12 @@
 
 //死区补偿参数
 #define DT_COMP_EN /*******************/ 1     // 死区补偿使能：1-使能，0-关闭
-#define DT_COMP_CCR /******************/ 20    // 死区补偿计数值，初始建议从 40 开始调试
-#define DT_COMP_CUR_TH /***************/ 0.05f //电流符号判定死区，避免过零附近抖动翻转
-#define DT_COMP_CCR_MARGIN /***********/ 5     // CCR限幅保护边界，防止补偿后贴边
+#define DT_COMP_CCR /******************/ 30    // 死区补偿计数值，初始建议从 40 开始调试
+#define DT_COMP_CUR_TH /***************/ 0.02f //电流符号判定死区，避免过零附近抖动翻转
+#define DT_COMP_CCR_MARGIN /***********/ 3     // CCR限幅保护边界，防止补偿后贴边
 
 //速度环有功阻尼参数
-#define SPD_BETA /************************/ 20.0f
+#define SPD_BETA /************************/ 30.0f
 #define SPD_ACTIVE_DAMP_BA /**************/ ((SPD_BETA * J - B) / (1.5f * MOTOR_P * Psi_f))
 #define SPD_ACTIVE_DAMP_KE /**************/ (SPD_ACTIVE_DAMP_BA * PIX2 / (60.0f * MOTOR_P))
 #define SPD_ACTIVE_DAMP_MAX /*************/ 5.0f
@@ -169,6 +169,6 @@
 #define OVER_CURRENT /*******************/ 2.0f // 过流保护阈值
 
 #define RGB_Luminance /*****************/ 4 // RGB LED亮度调节，一共8档(0~7)
-#define VR_OR_PC /**********************/ 0 // 电机命令方式: VR: 1 或 PC调速: 0
+#define VR_OR_PC /**********************/ 1 // 电机命令方式: VR: 1 或 PC调速: 0
 
 #endif
