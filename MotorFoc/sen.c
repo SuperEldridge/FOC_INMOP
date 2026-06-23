@@ -112,8 +112,12 @@ void SpeedCloseloop(int16_t SpeedRef, uint8_t UseRamp)
         final_spd_ref = Limit_Sat(final_spd_ref, 100, -100);//位置环速度限制
     }
 
-    float iq_ref = 0.0f;
-    float active_damp_iq = 0.0f;
+    float iq_ref = 0.0f;                    // 最终送入电流环的 q 轴电流给定
+    float active_damp_iq = 0.0f;            // 有功阻尼产生的 q 轴电流修正量
+#if (SPEED_CTRL_USE_SMC == 1)
+    static float smc_iq_ref_u = 0.0f;       // 保存图中控制量 u，实际为 SMC 输出的 q 轴电流给定
+    SMC_SPEED_INPUT smc_input;              // SMC 输入量结构体，用于隔离速度环和 SMC 模块
+#endif
     // 速度环计算频率控制
     if (++Para.SpeedCalTime >= SPEED_CNT)
     {
@@ -122,9 +126,16 @@ void SpeedCloseloop(int16_t SpeedRef, uint8_t UseRamp)
         pi_spd.Ref = final_spd_ref * Motor.P;
         pi_spd.Fbk = Motor.speed_E_rpm;
 
+#if (SPEED_CTRL_USE_SMC == 1)
+        smc_input.omega_ref_elec_rpm = pi_spd.Ref;   // 将原速度环电角速度给定传入 SMC
+        smc_input.omega_fbk_elec_rpm = pi_spd.Fbk;   // 将原速度环电角速度反馈传入 SMC
+        smc_input.iq_fbk_u = Park.Qs;                // 将当前 q 轴电流反馈作为图中 u 的反馈量传入观测器
+        smc_iq_ref_u = SmcSpeed_Update(&SmcSpeed, &smc_input); // 调用 SMC 模块计算图中的控制量 u
+#else
         PiController((M_PI_Control)&pi_spd); // 速度PI计算
 
         pi_spd.OutF = pi_spd.OutF * LPF_I_RUN_B + pi_spd.Out * LPF_I_RUN_A;
+#endif
     }
 
     #if SPD_ACTIVE_DAMP_EN
@@ -140,8 +151,13 @@ void SpeedCloseloop(int16_t SpeedRef, uint8_t UseRamp)
     #endif
     
     /* 速度环最终输出 = PI 输出 - 有功阻尼项 */
-    iq_ref = pi_spd.OutF - active_damp_iq;
-    iq_ref = Limit_Sat(iq_ref, PI_MAX_SPD, -PI_MAX_SPD);
+#if (SPEED_CTRL_USE_SMC == 1)
+    iq_ref = smc_iq_ref_u - active_damp_iq;    // SMC 输出的 u 叠加有功阻尼修正后形成电流环给定
+    iq_ref = Limit_Sat(iq_ref, SMC_IQ_LIMIT, -SMC_IQ_LIMIT); // 按 SMC 电流限幅保护 q 轴给定
+#else
+    iq_ref = pi_spd.OutF - active_damp_iq;     // PI 输出叠加有功阻尼修正后形成电流环给定
+    iq_ref = Limit_Sat(iq_ref, PI_MAX_SPD, -PI_MAX_SPD); // 按原 PI 电流限幅保护 q 轴给定
+#endif
     
     CurCloseloop(iq_ref, Motor.E_theta);
 }

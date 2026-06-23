@@ -27,7 +27,7 @@
 #define MOTOR_Rs /**********************/ 0.224f       // 电机内阻
 
 // ADC采样参数
-#define ADC_REFV /**********************/ 3.3f      // unit:V, ADC参考电压
+#define ADC_REFV /**********************/ 3.3f      // 单位：V，ADC参考电压
 #define ADC_REF_VALUE /*****************/ 4095      // 12-bit ADC
 #define I_GAIN /************************/ 0.018315f // 电流计算系数  (3.3/4095) / 0.044 其中0.044为电流传感器系数
 // #define I_GAIN /************************/ 0.0061f     // 电流计算系数  (3.3/4095) / 0.132  其中0.132为电流传感器系数
@@ -41,6 +41,16 @@
 #define PI_MAX_Ud /*********************/ 6.0f       //  (STAN_VOLTAGE_V*SART_OF_3*0.92)   // 13.5  //12.347
 #define PI_MAX_Uq /*********************/ 6.0f       //  (STAN_VOLTAGE_V*SART_OF_3*0.92)
 #define PI_MAX_SPD /********************/ 10.0f      // 最大电流限制
+
+// 速度环控制器选择：0 使用原 PI，1 使用 SMC
+#define SPEED_CTRL_USE_SMC /************/ 1           // 速度环一键切换宏，调试异常时改为 0 可回退 PI
+#define SMC_IQ_LIMIT /******************/ PI_MAX_SPD  // SMC 的 q 轴电流限幅，当前复用原速度 PI 限幅
+#define SMC_REACH_Q /*******************/ 80.0f       // 图中 q，指数趋近律线性项系数
+#define SMC_REACH_EPSILON /*************/ 30.0f       // 指数趋近律饱和项系数，增强靠近滑模面的收敛速度
+#define SMC_BOUNDARY_LAYER /************/ 1.0f        // 滑模边界层宽度，用于减小符号函数抖振
+#define SMC_STO_K1 /********************/ 80.0f       // 超螺旋观测器一阶增益，修正速度观测误差
+#define SMC_STO_K2 /********************/ 500.0f      // 超螺旋观测器二阶增益，更新扰动估计值
+#define SMC_DISTURBANCE_LIMIT /*********/ 3000.0f     // 扰动估计限幅，防止观测器输出过大
 #define kserver /********************/ 0.5f       // 服务器系数
 #define Umod_NOW /********************/ (sqrtf(Svpwm.Ualpha * Svpwm.Ualpha + Svpwm.Ubeta *Svpwm.Ubeta))
 #define SVPWM_KM_NOW /********************/ (AdcPara.Vbus * SART_OF_3)

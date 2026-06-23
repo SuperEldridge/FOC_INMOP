@@ -16,6 +16,7 @@
 #include "flux.h"
 #include "sen.h"
 #include "smo.h"
+#include "smc_speed.h"
 #include "fault.h"
 
 typedef struct

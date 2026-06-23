@@ -293,6 +293,7 @@ void MotorInit(void)
 	FluxInit(&flux);
 
 	//	SMO_Init();													//滑膜参数初始化
+	SmcSpeed_Init(&SmcSpeed);                                        // 初始化 SMC 速度控制器参数和内部状态
 	PiParaInit();													  // PID参数初始化
 	IirButterworthCoefficientInit(WE_IIR_LPF_Coeff, &WE_IIR_LPF_Par); // 低通滤波器参数初始化
 }
