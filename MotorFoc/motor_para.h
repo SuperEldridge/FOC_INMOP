@@ -44,13 +44,18 @@
 
 // 速度环控制器选择：0 使用原 PI，1 使用 SMC
 #define SPEED_CTRL_USE_SMC /************/ 1           // 速度环一键切换宏，调试异常时改为 0 可回退 PI
-#define SMC_IQ_LIMIT /******************/ PI_MAX_SPD  // SMC 的 q 轴电流限幅，当前复用原速度 PI 限幅
-#define SMC_REACH_Q /*******************/ 80.0f       // 图中 q，指数趋近律线性项系数
-#define SMC_REACH_EPSILON /*************/ 30.0f       // 指数趋近律饱和项系数，增强靠近滑模面的收敛速度
+#define SMC_STO_ENABLE /***************/ 1           // SMC 超螺旋扰动观测器使能，0 为纯滑模速度环
+#define SMC_CONTROL_MODE_CFG /**********/ 0           // SMC 控制律模式，0 为主流等效控制律
+#define SMC_ACTIVE_DAMP_WHEN_SMC /*****/ 0           // SMC 模式是否叠加外层主动阻尼，默认关闭避免重复补偿
+#define SMC_IQ_LIMIT /******************/ PI_MAX_SPD // SMC 的 q 轴电流限幅，当前复用原速度 PI 限幅
+#define SMC_INTEGRAL_LIMIT /*************/ 200   // 积分项 x1 限幅(仿 PI 积分限幅)，防 windup 残留导致过冲缓跌
+#define SMC_SLIDE_C /*******************/ 2.0f       // 图中 c，滑模面 s=c*x1+x2 的速度误差系数22
+#define SMC_REACH_Q /*******************/ 1000.0f       // 图中 q，指数趋近律线性项系数20.7
+#define SMC_REACH_EPSILON /*************/ 400.0f       // 指数趋近律饱和项系数，增强靠近滑模面的收敛速度
 #define SMC_BOUNDARY_LAYER /************/ 1.0f        // 滑模边界层宽度，用于减小符号函数抖振
-#define SMC_STO_K1 /********************/ 80.0f       // 超螺旋观测器一阶增益，修正速度观测误差
-#define SMC_STO_K2 /********************/ 500.0f      // 超螺旋观测器二阶增益，更新扰动估计值
-#define SMC_DISTURBANCE_LIMIT /*********/ 3000.0f     // 扰动估计限幅，防止观测器输出过大
+#define SMC_STO_K1 /********************/ 400.0f       // 超螺旋观测器一阶增益，修正速度观测误差 80
+#define SMC_STO_K2 /********************/ 40000.0f      // 超螺旋观测器二阶增益，更新扰动估计值 500
+#define SMC_DISTURBANCE_LIMIT /*********/ 30000.0f     // 扰动估计限幅，防止观测器输出过大
 #define kserver /********************/ 0.5f       // 服务器系数
 #define Umod_NOW /********************/ (sqrtf(Svpwm.Ualpha * Svpwm.Ualpha + Svpwm.Ubeta *Svpwm.Ubeta))
 #define SVPWM_KM_NOW /********************/ (AdcPara.Vbus * SART_OF_3)
@@ -70,7 +75,7 @@
 #define DT_COMP_CCR_MARGIN /***********/ 3     // CCR限幅保护边界，防止补偿后贴边
 
 //速度环有功阻尼参数
-#define SPD_BETA /************************/ 30.0f
+#define SPD_BETA /************************/ 20.0f
 #define SPD_ACTIVE_DAMP_BA /**************/ ((SPD_BETA * J - B) / (1.5f * MOTOR_P * Psi_f))
 #define SPD_ACTIVE_DAMP_KE /**************/ (SPD_ACTIVE_DAMP_BA * PIX2 / (60.0f * MOTOR_P))
 #define SPD_ACTIVE_DAMP_MAX /*************/ 5.0f
@@ -179,6 +184,6 @@
 #define OVER_CURRENT /*******************/ 2.0f // 过流保护阈值
 
 #define RGB_Luminance /*****************/ 4 // RGB LED亮度调节，一共8档(0~7)
-#define VR_OR_PC /**********************/ 1 // 电机命令方式: VR: 1 或 PC调速: 0
+#define VR_OR_PC /**********************/ 0 // 电机命令方式: VR: 1 或 PC调速: 0
 
 #endif

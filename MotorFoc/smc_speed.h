@@ -16,6 +16,12 @@ typedef enum
     SMC_OBSERVER_SUPER_TWISTING = 0,              // 当前使用超螺旋扰动观测器
 } SMC_OBSERVER_MODE;
 
+// SMC 控制律类型枚举，便于后续替换为积分型或自适应控制律
+typedef enum
+{
+    SMC_CONTROL_EQUIVALENT = 0,                   // 主流等效控制 + 趋近律 + 扰动补偿
+} SMC_CONTROL_MODE;
+
 // 趋近律参数结构体，对应图中的 ε 和 q
 typedef struct
 {
@@ -32,6 +38,7 @@ typedef struct
     float k2;                                     // 超螺旋二阶修正增益，用来更新扰动估计
     float disturbance_limit;                      // 扰动估计限幅，防止估计值失控
     SMC_OBSERVER_MODE mode;                       // 观测器模式，便于后续替换观测器
+    uint8_t enable;                               // 观测器使能开关，0 时退化为纯 SMC
 } SMC_OBSERVER_CFG;
 
 // SMC 速度控制器总配置结构体，集中保存模型参数、限幅和可替换模块配置
@@ -43,7 +50,10 @@ typedef struct
     float inertia;                                // 转动惯量，对应机械模型中的 J
     float damping;                                // 粘滞阻尼系数，对应机械模型中的 B
     float input_gain_d;                           // 图中 D，对应 q 轴电流到机械角加速度的输入增益
+    float slide_c;                                // 图中 c，滑模面 s=c*x1+x2 的速度误差系数
     float iq_limit;                               // SMC 输出的 q 轴电流限幅
+    float integral_limit;                         // 积分项 x1 限幅值，仿 PI 积分限幅，防 windup 残留
+    SMC_CONTROL_MODE control_mode;                // 控制律模式，便于后续替换控制器
     SMC_REACHING_CFG reaching;                    // 趋近律配置，当前为指数趋近律
     SMC_OBSERVER_CFG observer;                    // 扰动观测器配置，当前为超螺旋观测器
 } SMC_SPEED_CFG;
@@ -60,8 +70,10 @@ typedef struct
 typedef struct
 {
     float iq_ref_u;                               // 图中控制量 u，实际输出为 q 轴电流给定
-    float x2_speed_err;                           // 图中 x2，这里对应速度跟踪误差
-    float slide_s;                                // 图中 s，滑模面
+    float x1_speed_err;                           // 图中 x1，目标机械角速度-实际机械角速度
+    float x1_speed_err_prev;                      // 上一拍速度误差 x1，用于 x2 离散求导
+    float x2_speed_err;                           // 图中 x2，x1 的离散导数
+    float slide_s;                                // 图中 s，滑模面 s=c*x1+x2
     float reach_law;                              // 图中 εsgn(s)+qs，对应趋近律输出
     float disturbance_hat;                        // 扰动估计值，用于补偿负载扰动
     float omega_hat;                              // 速度观测值，用于超螺旋观测器内部迭代
@@ -73,6 +85,7 @@ typedef struct
     SMC_SPEED_CFG cfg;                            // 控制器配置参数
     SMC_SPEED_OUTPUT out;                         // 控制器输出和观测状态
     uint8_t observer_ready;                       // 观测器初始化标志，避免首次运行产生跳变
+    uint8_t diff_ready;                           // x1 求导初始化标志，防止首次 x2 导数冲击
 } SMC_SPEED_CTRL;
 
 extern SMC_SPEED_CTRL SmcSpeed;                   // 全局 SMC 速度控制器实例

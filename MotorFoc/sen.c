@@ -152,7 +152,11 @@ void SpeedCloseloop(int16_t SpeedRef, uint8_t UseRamp)
     
     /* 速度环最终输出 = PI 输出 - 有功阻尼项 */
 #if (SPEED_CTRL_USE_SMC == 1)
-    iq_ref = smc_iq_ref_u - active_damp_iq;    // SMC 输出的 u 叠加有功阻尼修正后形成电流环给定
+    #if SMC_ACTIVE_DAMP_WHEN_SMC
+    iq_ref = smc_iq_ref_u - active_damp_iq;    // 调试对比时允许 SMC 继续叠加外层主动阻尼
+    #else
+    iq_ref = smc_iq_ref_u;                     // SMC 内部已有模型阻尼和扰动补偿，默认不重复叠加外层阻尼
+    #endif
     iq_ref = Limit_Sat(iq_ref, SMC_IQ_LIMIT, -SMC_IQ_LIMIT); // 按 SMC 电流限幅保护 q 轴给定
 #else
     iq_ref = pi_spd.OutF - active_damp_iq;     // PI 输出叠加有功阻尼修正后形成电流环给定

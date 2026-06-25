@@ -227,11 +227,11 @@ void SendToVofa(void)
 	Usart.VofaData[4] = AdcFilPara.CurU;		  // 磁链观测角度
 	Usart.VofaData[5] = AdcFilPara.CurV;	  // HFI角度
 	Usart.VofaData[6] = AdcFilPara.CurW;	  // 滑膜观测角度
-	Usart.VofaData[7] = pi_id.Ref;		  // IF强拖角度
-	Usart.VofaData[8] = pi_id.Fbk;	  // U相电流
-	Usart.VofaData[9] = pi_spd.OutF;	  // V相电流
-	Usart.VofaData[10] = Wm;	  // W相电流
-	Usart.VofaData[11] = Park.Ds;			  // 实际位置
+	Usart.VofaData[7] = pi_spd.Ref/MOTOR_P;		  // IF强拖角度
+	Usart.VofaData[8] = pi_spd.Fbk/MOTOR_P;	  // U相电流
+	Usart.VofaData[9] = SmcSpeed.out.x1_speed_err;	  // V相电流
+	Usart.VofaData[10] = SmcSpeed.out.x2_speed_err;	  // W相电流
+	Usart.VofaData[11] = SmcSpeed.out.slide_s;			  // 实际位置
 	Usart.VofaData[12] = Park.Qs;			  // 目标位置
 	JustFloatSend(Usart.VofaData, 13, USART1);
 }
